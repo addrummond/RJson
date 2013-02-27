@@ -1,14 +1,10 @@
-************************************************************************
-| RJSon 0.3.7                                                          |
-| Author: Alex Drummond                                                |
-|                                                                      |
-| Thanks to Dustin DeWeese and Audrey Tang for patches fixing bugs in  | 
-| the parser.                                                          |
-| Thanks to Adam Langley for a patch fixing the lack of support for    |
-| null JSON values.                                                    |
-| Thanks to Maarten for fixing an inconsistency in the behavior of    |
-| serialization/parsing.                                               |
-************************************************************************
+RJSon 0.3.7
+Author: Alex Drummond
+
+Thanks to Dustin DeWeese and Audrey Tang for patches fixing bugs in
+the parser, Adam Langley for a patch fixing the lack of support for
+null JSON values, and Maarten for fixing an inconsistency in the
+behavior of serialization/parsing.
 
 This is some documentation on how to use the RJson library.  I wrote a
 blog post about an older version of the library which may contain some
@@ -19,6 +15,9 @@ http://lingnerd.blogspot.com/2007/12/pushing-haskells-type-system-to-limits.html
 ------------------------------------------------------------------------
 
 Not all features of the library are covered in this document yet.
+See also the documentation on Hackage:
+
+http://hackage.haskell.org/packages/archive/RJson/0.3.7/doc/html/Text-RJson.html
 
 IMPORTANT: Be sure to check the end of this README, which details a
 couple of issues with the library you should be aware of before using
