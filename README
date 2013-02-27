@@ -1,0 +1,197 @@
+************************************************************************
+| RJSon 0.3.7                                                          |
+| Author: Alex Drummond                                                |
+|                                                                      |
+| Thanks to Dustin DeWeese and Audrey Tang for patches fixing bugs in  | 
+| the parser.                                                          |
+| Thanks to Adam Langley for a patch fixing the lack of support for    |
+| null JSON values.                                                    |
+| Thanks to Maarten for fixing an inconsistency in the behavior of    |
+| serialization/parsing.                                               |
+************************************************************************
+
+This is some documentation on how to use the RJson library.  I wrote a
+blog post about an older version of the library which may contain some
+useful information on using syb-with-class:
+
+http://lingnerd.blogspot.com/2007/12/pushing-haskells-type-system-to-limits.html
+
+------------------------------------------------------------------------
+
+Not all features of the library are covered in this document yet.
+
+IMPORTANT: Be sure to check the end of this README, which details a
+couple of issues with the library you should be aware of before using
+it.
+
+------------------------------------------------------------------------
+
+Suppose we have the following datatypes:
+
+    data TestRecord2 = TestRecord2 {
+       _c :: Int,
+       _d :: String
+    } deriving Show
+
+    data TestRecord1 = TestRecord1 {
+       _a :: String,
+       _b :: TestRecord2
+    } deriving Show
+
+In order to use RJson, we first have to derive instances of Data and
+Typeable for these types.  The following options/modules are required:
+
+    {-# OPTIONS_GHC
+     -XTemplateHaskell
+     -XFlexibleInstances
+     -XMultiParamTypeClasses
+     -XFlexibleContexts
+     -XUndecidableInstances #-}
+    import Text.RJson
+    import Data.Generics.SYB.WithClass.Basics
+    import Data.Generics.SYB.WithClass.Derive
+
+The following Template Haskell code can be used to derive the
+instances automatically:
+
+    $(derive[''TestRecord1, ''TestRecord2])
+
+Now we can use the 'toJson' function to serialize TestRecord1 and
+TestRecord2 structures. For example, the expression
+
+    toJson (TestRecord1 { _a="foo", _b=TestRecord2 { _c=5, _d="bar"}})
+
+will evaluate to the following JsonData object:
+
+    {"a":"foo","b":{"c":5,"d":"bar"}
+
+You can just pass this object to 'show' to convert it to a string, or
+use the 'toJsonString' utility function. The current implementation of
+'show' outputs ASCII-only strings, using "\uXXXX" escape sequences for
+unicode characters.  Note that the initial underscores have been
+stripped from the field names.  This is the default behavior, but we
+could override it by adding an instance to the TranslateField class:
+
+    instance TranslateField TestRecord1 where
+        translateField _dummy x = x
+    instance TranslateField TestRecord2 where
+        translateField _dummy x = x
+
+Now if we call 'toJson', the underscores will not be removed:
+
+    {"_a":"foo","_b":{"_c":5,"_d":"bar"}
+
+The 'fromJson' function is used to deserialize a JsonData object.
+Usually, it is easier to use 'fromJsonString', which parses a string
+to a JsonData object and then passes the result to 'fromJson'. The
+following expression will evaluate to Just the same TestRecord1
+structure that we passed to 'toJson' earlier:
+
+    fromJsonString (undefined :: TestRecord1)
+                   "{\"_a\":\"foo\",\"_b\":{\"_c\":5,\"_d\":\"bar\"}}"
+    --> Right (TestRecord1 { _a="foo", _b=TestRecord2 { _c=5, _d="bar"}})
+
+The first parameter of 'fromJsonString' (and 'fromJson') is a dummy
+value specifying the type of the record which is being deserialized.
+Note that the preceding instance of TranslateField is in effect here
+(the JSON object keys begin with underscores).
+
+The 'fromJsonString' function assumes that the string it is passed is
+a true unicode string. For this reason, if you have obtained your JSON
+String using the standard Haskell IO libraries, you may not get the
+correct behavior with unicode strings (since your String will be a
+sequence of bytes rather than code points). It is usually better to
+get the raw JSON data into a ByteString and then use
+'fromJsonByteString', which automatically detects and decodes unicode
+strings.
+
+The JsonData type has the following definition:
+
+    data JsonData = JDString String                   |
+                    JDNumber Double                   |
+                    JDArray [JsonData]                |
+                    JDBool Bool                       |
+                    JDNull                            |
+                    JDObject (M.Map String JsonData)
+
+You can implement custom serialization and deserialization behavior
+by adding instances to the ToJson and FromJson classes respectively.
+Suppose that we have the following enum type:
+
+    data Direction = Forward | Back | Left | Right deriving Show
+    $(derive[''Direction])
+
+As will be explained shortly, the default serialization behavior is
+for the values of this enum to be converted to empty JSON lists, which
+is probably not what you want. In order to convert them to and from
+the appropriate strings, the following instance definitions can be
+added:
+
+    instance ToJson Direction where
+        toJson North   = JDString "north"
+        toJson South   = JDString "south"
+        toJson East    = JDString "east"
+        toJson West    = JDString "west"
+    instance FromJson Direction where
+        fromJson _dummy (JDString "north")  = Right North
+        fromJson _dummy (JDString "south")  = Right South
+        fromJson _dummy (JDString "east")   = Right East
+        fromJson _dummy (JDString "west")   = Right West
+        fromJson _dummy _                   = Left "Deserialization error for 'Direction'"
+
+In fact, RJson provides 'enumToJson' and 'enumFromJson' functions
+which automate the definition of instances of this sort. The preceding
+instance definitions could equivalently be written as follows:
+
+    instance ToJson Direction where
+        toJson = enumToJson firstCharToLower
+    instance FromJson Direction where
+        fromJson = enumFromJson firstCharToUpper
+
+The first arguments to 'enumToJson' and 'enumFromJson' are
+(String->String) functions used for converting Haskell enum
+constructor names to JSON strings and vice versa. The functions
+'firstCharToUpper' and 'firstCharToLower' are provided by RJson.
+
+Default serialization/deserialization behavior is as follows:
+
+    Haskell primitive types   <-->  Corresponding JSON type
+    Haskell records           <-->  JSON objects
+    Haskell tupels            <-->  Heterogenous JSON arrays
+    Haskell algebraic types &
+    newtypes                  <-->  JSON array of arguments given to
+                                    constructor. First constructor
+                                    always used when deserializing.
+                                    (Not a very useful default.)
+
+Both ToJson and FromJson have some other methods which can be used to
+customize serialization behavior (check the Haddock
+documentation). For example, you can specify default field values for
+JSON objects.  Note that there is no default implementation of the
+'toJson' or 'fromJson' methods, so if you are overriding other methods
+in an instance declaration of ToJson or FromJson, you can set 'toJson'
+and 'fromJson' to 'genericToJson' and 'genericFromJson' respectively
+in order to get the default behavior.
+
+The 'Union' type can be used to implement a kind of crude inheritance
+for Haskell record types.  The type has a single binary constructor
+('Union'). Unions are serialized by serializing each of the arguments
+to the constructor, then merging the resulting JSON objects into a
+single object.  If any of the arguments of the constructor does not
+serialize to a JSON object then a runtime error will occur.  To create
+unions of more than two records, just use `Union` as an infix
+constructor.  Type synonyms are defined for complex unions of this
+kind (Union3 a b c, Union4 a b c d, etc. etc.)
+
+------------------------------------------------------------------------
+
+WARNING: Record types with strict constructors will lead to runtime
+errors when using 'fromJson' ('toJson' will still work fine). This is
+because it seems to be necessary to temporarily create records with
+dummy field values. If the fields are strict, these dummy values get
+evaluated, leading to an exception being raised.
+
+OTHER WEIRD BUG: You cannot have a field of type X and a field whose
+type is a synonym of X in the same record. This leads to weird
+compile-time errors if you try to serialize the record. I have no idea
+why (but this is normally easy to work around).
