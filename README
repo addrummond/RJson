@@ -157,7 +157,7 @@ Default serialization/deserialization behavior is as follows:
 
     Haskell primitive types   <-->  Corresponding JSON type
     Haskell records           <-->  JSON objects
-    Haskell tupels            <-->  Heterogenous JSON arrays
+    Haskell tuples            <-->  Heterogenous JSON arrays
     Haskell algebraic types &
     newtypes                  <-->  JSON array of arguments given to
                                     constructor. First constructor
