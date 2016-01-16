@@ -62,7 +62,7 @@ TestRecord2 structures. For example, the expression
 
 will evaluate to the following JsonData object:
 
-    {"a":"foo","b":{"c":5,"d":"bar"}
+    {"a":"foo","b":{"c":5,"d":"bar"}}
 
 You can just pass this object to 'show' to convert it to a string, or
 use the 'toJsonString' utility function. The current implementation of
@@ -78,7 +78,7 @@ could override it by adding an instance to the TranslateField class:
 
 Now if we call 'toJson', the underscores will not be removed:
 
-    {"_a":"foo","_b":{"_c":5,"_d":"bar"}
+    {"_a":"foo","_b":{"_c":5,"_d":"bar"}}
 
 The 'fromJson' function is used to deserialize a JsonData object.
 Usually, it is easier to use 'fromJsonString', which parses a string
